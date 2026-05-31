@@ -1,0 +1,6 @@
+node_modules
+**/*.concat.*
+
+js/constants_local.js
+dist/*
+!dist/.gitkeep

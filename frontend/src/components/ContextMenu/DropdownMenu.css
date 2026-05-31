@@ -1,0 +1,95 @@
+/* ============================================================== *
+ *  PttChrome v3 — macOS-style context menu (HIG)                 *
+ *  Translucent dark popover, rounded, blue selection highlight.  *
+ * ============================================================== */
+
+.DropdownMenu--reset.dropdown-menu {
+  min-width: 210px;
+  padding: 5px;
+  margin: 0;
+  background: rgba(40, 40, 43, 0.82);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5),
+    0 0 0 0.5px rgba(0, 0, 0, 0.3);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "PingFang TC", sans-serif;
+  -webkit-user-select: none;
+}
+
+.DropdownMenu--reset > li > a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 12px !important;
+  border-radius: 5px;
+  color: #f2f2f7 !important;
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: default;
+  -webkit-user-select: none;
+}
+
+.DropdownMenu--reset > li > a:hover,
+.DropdownMenu--reset > li > a:focus {
+  color: #fff !important;
+  background-color: var(--mac-accent, #0a84ff) !important;
+  background-image: none !important;
+}
+
+.DropdownMenu--reset > li > a:hover span,
+.DropdownMenu--reset > li > a:focus span {
+  color: #fff !important;
+}
+
+/* Separator between menu groups */
+.DropdownMenu--reset > li.divider {
+  height: 0;
+  margin: 5px 8px;
+  background: transparent;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.16);
+}
+
+.DropdownMenu__Item__HotKey {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.DropdownMenu__Item--checked::before {
+  content: "\2713";
+  position: absolute;
+  left: 12px;
+  color: #f2f2f7;
+}
+
+.DropdownMenu__Item--quickSearch {
+  position: relative;
+}
+.DropdownMenu__Item--quickSearch .QuickSearchMenu {
+  display: none;
+}
+.DropdownMenu__Item--quickSearch:hover .QuickSearchMenu {
+  display: block;
+}
+.QuickSearchMenu {
+  left: 100%;
+  top: 0px;
+  margin-top: -5px;
+  margin-left: -1px;
+}
+.QuickSearchMenu--up {
+  top: initial !important;
+  bottom: 0px;
+  margin-top: 0px !important;
+  margin-bottom: -5px;
+}
+.QuickSearchMenu--left {
+  right: 100%;
+  left: initial !important;
+  margin-left: 0px !important;
+  margin-right: -1px;
+}

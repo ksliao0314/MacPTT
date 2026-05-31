@@ -1,0 +1,532 @@
+/* ============================================================== *
+ *  PttChrome v3 — macOS-style Settings sheet (HIG)               *
+ *  Dark appearance to match the terminal. Grouped inset lists,   *
+ *  switches, pop-up buttons, text fields, SF system font.        *
+ * ============================================================== */
+
+:root {
+  --mac-font: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "SF Pro Display", "Helvetica Neue", "PingFang TC", sans-serif;
+  --mac-bg: #2b2b2e;
+  --mac-sidebar: #232325;
+  --mac-text: #f2f2f7;
+  --mac-text-2: rgba(235, 235, 245, 0.6);
+  --mac-text-3: rgba(235, 235, 245, 0.42);
+  --mac-accent: #0a84ff;
+  --mac-green: #32d74b;
+  --mac-red: #ff6961;
+  --mac-fill: rgba(255, 255, 255, 0.09);
+  --mac-fill-2: rgba(255, 255, 255, 0.05);
+  --mac-border: rgba(255, 255, 255, 0.12);
+  --mac-sep: rgba(255, 255, 255, 0.08);
+}
+
+/* ---- Modal shell overrides (react-bootstrap) ---- */
+.PrefModal .modal-dialog {
+  width: 720px;
+  max-width: 92vw;
+  margin: 6vh auto;
+  -webkit-user-select: none;
+}
+.PrefModal .modal-content {
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.PrefModal .modal-body {
+  padding: 0;
+}
+
+/* ---- Sheet ---- */
+.macSheet {
+  display: flex;
+  height: 76vh;
+  min-height: 460px;
+  max-height: 680px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--mac-bg);
+  color: var(--mac-text);
+  font-family: var(--mac-font);
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.55),
+    0 0 0 0.5px rgba(255, 255, 255, 0.08);
+}
+
+/* ---- Sidebar ---- */
+.macSheet__sidebar {
+  flex: 0 0 196px;
+  width: 196px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px;
+  background: var(--mac-sidebar);
+  border-right: 0.5px solid var(--mac-sep);
+}
+.macSheet__brand {
+  padding: 2px 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mac-text-2);
+}
+.macSheet__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.macNavItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mac-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.macNavItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.macNavItem.is-active {
+  background: var(--mac-accent);
+  color: #fff;
+}
+.macNavItem__icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  opacity: 0.92;
+}
+.macNavItem__icon svg {
+  width: 16px;
+  height: 16px;
+}
+.macSheet__reset {
+  margin-top: auto;
+}
+
+/* ---- Main column ---- */
+.macSheet__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.macSheet__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 0.5px solid var(--mac-sep);
+}
+.macSheet__toolbarTitle {
+  font-size: 15px;
+  font-weight: 600;
+}
+.macSheet__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+}
+.macPane {
+  max-width: 100%;
+}
+
+/* ---- Grouped inset list ---- */
+.macSection {
+  margin-bottom: 20px;
+}
+.macSection:last-child {
+  margin-bottom: 0;
+}
+.macSection__title {
+  padding: 0 12px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--mac-text-3);
+}
+.macSection__footnote {
+  padding: 6px 12px 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--mac-text-3);
+}
+.macGroup {
+  background: var(--mac-fill-2);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.macRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 7px 12px;
+  border-top: 0.5px solid var(--mac-sep);
+}
+.macGroup > .macRow:first-child {
+  border-top: none;
+}
+.macRow--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.macRow__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.macRow__label {
+  font-size: 13px;
+  color: var(--mac-text);
+}
+.macRow__hint {
+  font-size: 11px;
+  color: var(--mac-text-2);
+}
+
+/* ---- Switch ---- */
+.macSwitch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 23px;
+  border-radius: 23px;
+  background: rgba(120, 120, 128, 0.32);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.macSwitch:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.4);
+}
+.macSwitch.is-on {
+  background: var(--mac-green);
+}
+.macSwitch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.18s;
+}
+.macSwitch.is-on .macSwitch__knob {
+  transform: translateX(15px);
+}
+
+/* ---- Pop-up button (select) ---- */
+.macSelectWrap {
+  flex: 0 0 auto;
+}
+.macSelect {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 96px;
+  padding: 4px 26px 4px 10px;
+  border: 0.5px solid var(--mac-border);
+  border-radius: 6px;
+  background-color: var(--mac-fill);
+  color: var(--mac-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='16' viewBox='0 0 10 16'><path fill='%230a84ff' d='M5 0.5l3.2 4H1.8zM5 15.5l3.2-4H1.8z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  background-size: 9px 14px;
+}
+.macSelect:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.4);
+  border-color: var(--mac-accent);
+}
+.macSelect option {
+  color: #000;
+}
+
+/* ---- Text / number field ---- */
+.macField {
+  flex: 0 0 auto;
+  width: 96px;
+  padding: 4px 9px;
+  border: 0.5px solid var(--mac-border);
+  border-radius: 6px;
+  background: var(--mac-fill);
+  color: var(--mac-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: right;
+}
+.macField--wide {
+  width: 100%;
+  text-align: left;
+  box-sizing: border-box;
+}
+.macField:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.4);
+  border-color: var(--mac-accent);
+}
+
+/* ---- Slider ---- */
+.macSliderWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.macSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 140px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.18);
+}
+.macSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+.macSliderVal {
+  width: 14px;
+  text-align: center;
+  color: var(--mac-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Buttons ---- */
+.macBtn {
+  padding: 5px 14px;
+  border: 0.5px solid var(--mac-border);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--mac-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.macBtn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.macBtn:active {
+  background: rgba(255, 255, 255, 0.22);
+}
+.macBtn--primary {
+  border-color: transparent;
+  background: var(--mac-accent);
+  color: #fff;
+  font-weight: 500;
+}
+.macBtn--primary:hover {
+  background: #0a74e0;
+}
+.macBtn--danger {
+  color: var(--mac-red);
+}
+.macBtn--sm {
+  padding: 3px 11px;
+  font-size: 12px;
+}
+.macTextBtn {
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  color: var(--mac-accent);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.macTextBtn:hover {
+  text-decoration: underline;
+}
+.macSheet__reset {
+  color: var(--mac-red);
+}
+
+/* ---- Plain form (Account / Blacklist panes) ---- */
+.macForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.macFormField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.macFormField > label {
+  font-size: 12px;
+  color: var(--mac-text-2);
+}
+.macInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 0.5px solid var(--mac-border);
+  border-radius: 7px;
+  background: var(--mac-fill);
+  color: var(--mac-text);
+  font: inherit;
+  font-size: 13px;
+}
+.macInput:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.4);
+  border-color: var(--mac-accent);
+}
+.macCheckRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.macBtnRow {
+  display: flex;
+  gap: 8px;
+}
+.macHint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--mac-text-3);
+}
+.macStatus {
+  font-size: 12px;
+  color: var(--mac-text-2);
+}
+.macStatus b {
+  color: var(--mac-text);
+}
+
+/* ---- List (blacklist) ---- */
+.macList {
+  border: 0.5px solid var(--mac-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--mac-fill-2);
+}
+.macList__scroll {
+  max-height: 220px;
+  overflow-y: auto;
+}
+.macList__header {
+  padding: 6px 11px;
+  font-size: 11px;
+  color: var(--mac-text-3);
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 0.5px solid var(--mac-sep);
+}
+.macList__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 11px;
+  border-top: 0.5px solid var(--mac-sep);
+}
+.macList__row:first-child {
+  border-top: none;
+}
+.macList__row .mono {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12.5px;
+}
+.macList__empty {
+  padding: 12px 11px;
+  color: var(--mac-text-3);
+}
+.macChipBtn {
+  padding: 2px 10px;
+  border: 0.5px solid rgba(255, 105, 97, 0.5);
+  border-radius: 5px;
+  background: rgba(255, 105, 97, 0.12);
+  color: var(--mac-red);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.macChipBtn:hover {
+  background: rgba(255, 105, 97, 0.22);
+}
+
+/* Scrollable panes use the native macOS overlay scrollbars (the sheet inherits
+   color-scheme: dark), so no custom ::-webkit-scrollbar styling here. */
+
+/* ---- About pane ---- */
+.macAboutHead {
+  text-align: center;
+  padding: 6px 0 18px;
+}
+.macAboutName {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.macAboutVer {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--mac-text-2);
+}
+.macAboutDesc {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--mac-text-2);
+}
+.macRow--link {
+  cursor: pointer;
+}
+.macRow--link:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.macLicenseTag {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid var(--mac-border);
+  font-size: 11px;
+  color: var(--mac-text-2);
+  white-space: nowrap;
+}
+.macLinkArrow {
+  color: var(--mac-accent);
+  font-size: 13px;
+}
+.macChangelogDate {
+  font-weight: 400;
+  color: var(--mac-text-3);
+  font-size: 12px;
+}
+.macChangelog {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--mac-text-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.macChangelog li {
+  margin: 2px 0;
+}

@@ -1,0 +1,105 @@
+{
+  "name": "pttchrome",
+  "version": "1.2.0",
+  "dependencies": {
+    "base58": "^1.0.1",
+    "bootstrap": "^3.3.7",
+    "classnames": "^2.2.5",
+    "hammerjs": "^2.0.8",
+    "jquery": "^3.2.1",
+    "react": "^16.2.0",
+    "react-bootstrap": "^0.31.5",
+    "react-dom": "^16.2.0",
+    "react-overlays": "^0.7.4",
+    "recompose": "^0.26.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.8.7",
+    "@babel/plugin-proposal-class-properties": "^7.8.3",
+    "@babel/plugin-proposal-object-rest-spread": "^7.8.3",
+    "@babel/plugin-syntax-dynamic-import": "^7.8.3",
+    "@babel/preset-env": "^7.8.7",
+    "@babel/preset-react": "^7.8.3",
+    "babel-loader": "^8.0.6",
+    "cross-env": "^7.0.2",
+    "css-loader": "^3.4.2",
+    "css-url-relative-plugin": "^1.0.0",
+    "file-loader": "^5.1.0",
+    "html-webpack-harddisk-plugin": "^1.0.1",
+    "html-webpack-plugin": "^3.2.0",
+    "husky": "^4.2.3",
+    "lint-staged": "^10.0.8",
+    "mini-css-extract-plugin": "^0.9.0",
+    "optimize-css-assets-webpack-plugin": "^5.0.3",
+    "prettier": "^1.19.1",
+    "rimraf": "^3.0.2",
+    "uglifyjs-webpack-plugin": "^2.2.0",
+    "url-loader": "^3.0.0",
+    "webpack": "^4.42.0",
+    "webpack-cdn-plugin": "^3.2.2",
+    "webpack-cli": "^3.3.11",
+    "webpack-dev-server": "^3.10.3"
+  },
+  "lint-staged": {
+    "*.json": [
+      "prettier --write",
+      "git add"
+    ],
+    "src/components/**/*.{js,json,css}": [
+      "prettier --write",
+      "git add"
+    ]
+  },
+  "babel": {
+    "env": {
+      "development": {
+        "presets": [
+          [
+            "@babel/preset-env",
+            {
+              "modules": false
+            }
+          ],
+          [
+            "@babel/preset-react"
+          ]
+        ],
+        "plugins": [
+          "@babel/syntax-dynamic-import",
+          "@babel/plugin-proposal-class-properties",
+          "@babel/plugin-proposal-object-rest-spread"
+        ]
+      },
+      "production": {
+        "presets": [
+          [
+            "@babel/preset-env",
+            {
+              "modules": false
+            }
+          ],
+          [
+            "@babel/preset-react"
+          ]
+        ],
+        "plugins": [
+          "@babel/syntax-dynamic-import",
+          "@babel/plugin-proposal-class-properties",
+          "@babel/plugin-proposal-object-rest-spread"
+        ]
+      }
+    }
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "scripts": {
+    "clean": "rimraf dist/assets dist/index.html",
+    "prebuild": "npm run clean",
+    "build": "cross-env webpack",
+    "prestart": "npm run clean",
+    "start": "cross-env NODE_ENV=development webpack-dev-server"
+  }
+}

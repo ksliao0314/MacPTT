@@ -1,0 +1,67 @@
+# MacPTT 版本日誌
+
+原生 macOS 的 PTT BBS 客戶端。衍生自 [PttChrome](https://github.com/robertabcd/PttChrome)（GPL-2.0），本專案同樣以 **GNU GPL v2.0** 開放原始碼釋出。
+
+格式參考 [Keep a Changelog](https://keepachangelog.com/)。
+
+---
+
+## [1.1.0] - 2026-05-31
+
+### 新增
+- **iCloud 同步**：透過 iCloud Drive（`~/Library/Mobile Documents/.../MacPTT/sync.json`）在使用者的多台 Mac 之間同步**設定與黑名單**。預設關閉，可在「設定 → 一般 → 雲端」開啟。免簽章 / 免開發者帳號。
+  - 黑名單採**累加合併（union）**，不會弄丟任何一台新增的項目（代價：移除不跨機同步）。
+  - 其他設定以**最後修改者為準**。
+  - **密碼不同步**（本機金鑰不上雲）。
+
+### 修正
+- 進一步修正**滑鼠瀏覽偶發卡死**：除了先前的「卡住的按鍵旗標」，殘留的文字選取也會凍結瀏覽。改為以即時按鍵狀態（`e.buttons`）判定 hover——沒按鍵就一律瀏覽，只有真的按著拖曳選取時才讓位。
+
+---
+
+## [1.0.2] - 2026-05-31
+
+### 安全性
+- 啟用 **Content-Security-Policy**（封鎖內聯腳本注入，限制 connect / object / base）。
+- 加入 **SSRF 防護**：抓取連結預覽 / 圖片前，解析主機並擋下 loopback / 區域網路 / link-local / 雲端 metadata 等非公開位址；修補 IPv4-mapped、6to4、NAT64 等 IPv6 繞過，以及轉址繞過（逐跳重新驗證）。
+- WebSocket 連線限定 `*.ptt.cc`；`open_external` 改為不分大小寫的 http(s) 檢查；連結預覽圖只接受 https。
+
+### 新增
+- 設定新增 **「關於」頁**：列出授權、使用的開源專案與其授權、版本日誌。
+
+### 修正
+- YouTube 連結偵測誤判（`notyoutube.com`、夾帶在他站網址中的 youtu.be 等）。
+- 連線不支援協定分支的變數錯誤；內嵌圖片元件卸載後 setState 警告。
+
+---
+
+## [1.0.1] - 2026-05-31
+
+### 修正
+- **滑鼠瀏覽偶爾完全卡住**：漏接 mouseup（拖到視窗外放開、焦點被分享面板/外部連結搶走）導致按鍵旗標卡住 → 改為移動滑鼠即依實際按鍵狀態自我修復。
+- **自動開圖**：內嵌圖片在終端機縮放容器中因 IntersectionObserver 失效而不顯示 → 加入保險顯示機制，imgur / 一般圖片皆能可靠內嵌。
+- **強調光條偶爾消失**、**往右滑返回時閃黑**：頁面狀態變更時改用滑鼠位置重算高亮、並將捲動歸零。
+- 在推文將作者**加入黑名單可即時淡化**（直接套用 DOM，不等 React 重繪）。
+
+### 新增
+- **YouTube 連結縮圖預覽**（縮圖 + 播放鍵，點擊以系統瀏覽器開啟）。
+
+---
+
+## [1.0.0] - 2026-05-31
+
+首個原生 macOS 版本。
+
+### 新增
+- **連線**：Tauri + Rust（tokio-tungstenite）連 `wss://ws.ptt.cc/bbs`，以 `Origin: https://term.ptt.cc` 通過 PTT 白名單；前端沿用 PttChrome 終端機核心（ANSI / Big5 / 滑鼠瀏覽）。
+- **自動登入**：帳密儲存於本機、以 AES-256-GCM 加密（不上傳）；偵測密碼錯誤即停止避免被鎖。
+- **黑名單**：作者淡化、右鍵加入 / 移除、匯入匯出、內建「PTT 大秘寶」（rhino0314 整理）。
+- **預覽 / 分享**：圖片內嵌、連結 OG 預覽卡、文章網址分享圖示；原生 macOS 分享面板（圖片 / 網址）。
+- **macOS 原生**：應用程式選單列（⌘, 設定、⌘R 重整、編輯複製貼上、關於）、記住視窗大小位置、鎖定視窗比例、深色外觀、跟隨系統強調色。
+- **改名**：產品名 MacPTT、P 字終端機提示符風格的 App 圖示。
+
+---
+
+## 開發前史（pre-1.0）
+
+本專案源自一個無法運作的 `PttChrome 1.5.3pre`（已停止支援的 Chrome App，使用 `chrome.sockets.tcp` 連早已關閉的明文 Telnet）。重生過程：先評估可行性，確認瀏覽器/webview 無法直接做 raw TCP、且 PTT 的 `ws.ptt.cc` 強制 Origin 白名單；最終選擇 **原生 macOS（Tauri）** 方案，由 Rust 端設定 Origin 連線，前端沿用 `robertabcd/PttChrome` 終端機核心。
