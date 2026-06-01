@@ -1,0 +1,126 @@
+/* MacPTT — shared top banner card in the macOS HIG style (see
+   ContextMenu/PrefModal.css for the --mac-* tokens). Replaces the old
+   react-bootstrap PageTopAlert used by the disconnect / developer-mode /
+   paste-shortcut prompts. */
+
+.macAlert {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483646;
+  pointer-events: none; /* only the card is interactive */
+}
+
+.macAlert__card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 360px;
+  max-width: calc(100vw - 28px);
+  padding: 14px 16px;
+  box-sizing: border-box;
+  pointer-events: auto;
+
+  font-family: var(--mac-font);
+  color: var(--mac-text);
+  background: rgba(43, 43, 46, 0.92);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid var(--mac-border);
+  border-radius: 12px;
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(0, 0, 0, 0.4);
+
+  animation: macAlertIn 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes macAlertIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.macAlert__icon {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+.macAlert__icon--danger {
+  background: rgba(255, 105, 97, 0.18);
+  color: var(--mac-red);
+}
+.macAlert__icon--warning {
+  background: rgba(255, 159, 10, 0.18);
+  color: #ff9f0a;
+}
+.macAlert__icon--info {
+  background: rgba(10, 132, 255, 0.18);
+  color: var(--mac-accent);
+}
+
+.macAlert__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.macAlert__title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.macAlert__text {
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--mac-text-2);
+}
+
+.macAlert__actions {
+  margin-top: 11px;
+}
+
+/* reuse .macBtn / .macBtn--primary from PrefModal.css */
+.macAlert__kbd {
+  margin-left: 7px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.macAlert__close {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--mac-text-3);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.macAlert__close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--mac-text);
+}

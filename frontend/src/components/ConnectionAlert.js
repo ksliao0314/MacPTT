@@ -1,19 +1,18 @@
 import React from "react";
 import { compose, lifecycle } from "recompose";
-import { Alert, Button, Fade } from "react-bootstrap";
-import { i18n } from "../js/i18n";
-import "./PageTopAlert.css";
+import { MacAlert, DisconnectGlyph } from "./MacAlert";
 
 const enhance = compose(
   lifecycle({
     componentDidMount() {
+      // While the prompt is up, swallow ALL keys so nothing leaks to the (now
+      // dead) terminal; Enter triggers the reconnect.
       this.handler = e => {
-        if (e.keyCode == 13) {
+        if (e.keyCode === 13) {
           this.props.onDismiss();
         }
-        // Kills everything becase we don't want any further action performed under ConnectionAlert status
-        event.preventDefault();
-        event.stopImmediatePropagation();
+        e.preventDefault();
+        e.stopImmediatePropagation();
       };
       window.addEventListener("keydown", this.handler, true);
     },
@@ -23,18 +22,18 @@ const enhance = compose(
   })
 );
 
-export const ConnectionAlert = ({ onDismiss }) => (
-  <Fade in>
-    <Alert bsStyle="danger" className="PageTopAlert" onDismiss={onDismiss}>
-      <h4>{i18n("alert_connectionHeader")}</h4>
-      <p>{i18n("alert_connectionText")}</p>
-      <p>
-        <Button bsStyle="danger" onClick={onDismiss}>
-          {i18n("alert_connectionReconnect")}
-        </Button>
-      </p>
-    </Alert>
-  </Fade>
+export const ConnectionAlert = ({ onDismiss, onClose }) => (
+  <MacAlert
+    variant="danger"
+    icon={<DisconnectGlyph />}
+    title="連線已中斷"
+    text="與 PTT 的連線已斷開，要重新連線嗎？"
+    primaryLabel="重新連線"
+    kbd="⏎"
+    onPrimary={onDismiss}
+    onClose={onClose || onDismiss}
+    ariaLabel="連線已中斷"
+  />
 );
 
 export default enhance(ConnectionAlert);

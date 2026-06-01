@@ -29,7 +29,13 @@ export function setupSettingsButton(app) {
     app.modalShown = false;
     app.setInputAreaFocus();
     app.switchToEasyReadingMode(app.view.useEasyReadingMode);
+    // Unmounting runs CredentialManager.componentWillUnmount, which flushes the
+    // account and (for a first-time auto-login setup) raises this flag.
     ReactDOM.unmountComponentAtNode(container);
+    if (window.__macpttWantReconnect) {
+      window.__macpttWantReconnect = false;
+      if (app.connectState === 1 && app.reconnect) app.reconnect();
+    }
   }
 
   function openSettings() {

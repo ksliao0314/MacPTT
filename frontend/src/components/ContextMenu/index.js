@@ -81,6 +81,16 @@ const onPrefSaveImpl = (pttchrome, values) => {
   pttchrome.setInputAreaFocus();
   pttchrome.switchToEasyReadingMode(pttchrome.view.useEasyReadingMode);
 
+  // PrefModal unmounts on the next render (showsSettings:false), and its
+  // CredentialManager raises this flag when a first-time auto-login setup was
+  // saved. Check it after that unmount so the saved account logs in now.
+  setTimeout(function() {
+    if (window.__macpttWantReconnect) {
+      window.__macpttWantReconnect = false;
+      if (pttchrome.connectState === 1 && pttchrome.reconnect) pttchrome.reconnect();
+    }
+  }, 0);
+
   return {
     showsSettings: false
   };

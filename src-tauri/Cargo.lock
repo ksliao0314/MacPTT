@@ -2819,9 +2819,10 @@ dependencies = [
 
 [[package]]
 name = "pttchrome-v3-tauri"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "aes-gcm",
+ "block2",
  "futures-util",
  "objc2",
  "objc2-app-kit",

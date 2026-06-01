@@ -217,6 +217,28 @@ App.prototype.connect = function(url) {
   };
 };
 
+// Deliberately drop the current session and open a fresh one. The new
+// connection re-runs auto-login with the saved credentials, so this is how a
+// first-time account setup logs in without restarting the app.
+// We do NOT call conn.close() (that would pop the reconnect prompt) — opening a
+// new connection makes the Rust side abort the previous one by id takeover.
+App.prototype.reconnect = function() {
+  var url = (this.connectedUrl && this.connectedUrl.url);
+  if (!url) return;
+  if (this.timerEverySec) {
+    this.timerEverySec.cancel();
+    this.timerEverySec = null;
+  }
+  this.cancelMbTimer();
+  // Bypass the 3s throttle for an explicit, user-intended reconnect.
+  this._lastConnectAt = 0;
+  if (this._reconnectTimer) {
+    clearTimeout(this._reconnectTimer);
+    this._reconnectTimer = null;
+  }
+  this.connect(url);
+};
+
 App.prototype._parseURLSimple = function(url) {
   var protocol = url.split(/:\/\//, 2);
   if (protocol.length != 2)
@@ -315,9 +337,14 @@ App.prototype.onClose = function() {
     ReactDOM.unmountComponentAtNode(container);
     this.connect(this.connectedUrl.url);
   }
+  // ✕ closes the prompt WITHOUT reconnecting — the user can reconnect later via
+  // the menu bar (檢視 → 重新連線, ⌘⇧R).
+  const onClose = () => {
+    ReactDOM.unmountComponentAtNode(container);
+  }
   const container = document.getElementById('reactAlert');
   ReactDOM.render(
-    <ConnectionAlert onDismiss={onDismiss} />,
+    <ConnectionAlert onDismiss={onDismiss} onClose={onClose} />,
     container
   );
   this.updateTabIcon('disconnect');
@@ -803,6 +830,37 @@ App.prototype.resetMouseCursor = function(cX, cY) {
   this.buf.mouseCursor = 11;
 };
 
+// Ring buffer of recent (time, x, y) cursor samples (~600ms), recorded on plain
+// mouse moves. Used to rewind past gesture-start drift (see beginGestureFreeze).
+App.prototype._recordCursor = function(t, x, y) {
+  if (!this._curHist) this._curHist = [];
+  this._curHist.push({ t: t, x: x, y: y });
+  var cut = t - 600;
+  while (this._curHist.length > 1 && this._curHist[0].t < cut) {
+    this._curHist.shift();
+  }
+};
+
+// Called the instant a multi-finger gesture is first detected. The first finger
+// of a 2/3-finger swipe usually lands and slides a few px before the OS reports
+// the gesture, dragging the hover highlight with it. Rewind the remembered
+// position (and the highlight) to a sample from just BEFORE that drift, so once
+// the freeze (mouse_* guards) takes over, the cursor sits exactly where it was.
+App.prototype.beginGestureFreeze = function(now) {
+  if (!this._curHist || !this._curHist.length) return;
+  var target = now - 200; // ~200ms back clears typical finger-landing drift
+  var pick = this._curHist[0];
+  for (var i = this._curHist.length - 1; i >= 0; i--) {
+    if (this._curHist[i].t <= target) { pick = this._curHist[i]; break; }
+  }
+  this.curX = pick.x;
+  this.curY = pick.y;
+  if (this.buf && this.buf.useMouseBrowsing && !this.modalShown &&
+      window.getSelection().isCollapsed && !this.mouseLeftButtonDown) {
+    this.onMouse_move(pick.x, pick.y);
+  }
+};
+
 App.prototype.onValuesPrefChange = function(values) {
   for (var name in values) {
     this.onPrefChange(name, values[name]);
@@ -912,6 +970,17 @@ App.prototype.onPrefChange = function(name, value) {
     case 'trackpadScrollSpeed':
       this.view.trackpadScrollSpeed = value;
       break;
+    case 'trackpadGesture':
+      // JS gate for the gesture event listeners (native_menu.js).
+      this.trackpadGestureEnabled = !!value;
+      // Native gate: stops the Rust monitor from pinning the cursor / emitting
+      // paging events when off, so the trackpad behaves completely normally.
+      try {
+        if (window.__TAURI__ && window.__TAURI__.core) {
+          window.__TAURI__.core.invoke('set_gesture_enabled', { enabled: !!value });
+        }
+      } catch (e) {}
+      break;
     case 'enableEasyReading':
       // DO NOT set this.view.useEasyReadingMode here. Easy-reading renders the
       // article into #mainContainer, which only exists after a normal screen has
@@ -963,6 +1032,13 @@ App.prototype.checkClass = function(cn) {
 App.prototype.mouse_click = function(e) {
   if (this.modalShown)
     return;
+  // During a trackpad multi-finger gesture (incl. the release click) → don't let
+  // the incidental click enter a board/article.
+  if (this._gestureUntil && Date.now() < this._gestureUntil) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
   var skipMouseClick = (this.CmdHandler.getAttribute('SkipMouseClick') == '1');
   this.CmdHandler.setAttribute('SkipMouseClick','0');
 
@@ -1030,6 +1106,10 @@ App.prototype.middleMouse_down = function(e) {
 App.prototype.mouse_down = function(e) {
   if (this.modalShown)
     return;
+  // Swallow button events synthesised during a trackpad multi-finger gesture
+  // (e.g. three-finger drag) so paging never starts a click/drag-select.
+  if (this._gestureUntil && Date.now() < this._gestureUntil)
+    return;
   //0=left button, 1=middle button, 2=right button
   if (e.button === 0) {
     if (this.buf.useMouseBrowsing) {
@@ -1063,6 +1143,11 @@ App.prototype.mouse_down = function(e) {
 
 App.prototype.mouse_up = function(e) {
   if (this.modalShown)
+    return;
+  // During a multi-finger gesture, the button-release would otherwise call
+  // onMouse_move() below and snap the hover highlight to the release point —
+  // freeze it (the user is only paging).
+  if (this._gestureUntil && Date.now() < this._gestureUntil)
     return;
   //0=left button, 1=middle button, 2=right button
   if (e.button === 0) {
@@ -1114,6 +1199,18 @@ App.prototype.mouse_move = function(e) {
     if (this.view) this.view.setHighlightedRow(-1);
     return;
   }
+  // During a trackpad multi-finger gesture (paging), keep the hover highlight and
+  // remembered position exactly where they are — the user only wants to page, not
+  // move the cursor (same as the two-finger back gesture).
+  var _nowMM = Date.now();
+  if (this._gestureUntil && _nowMM < this._gestureUntil) {
+    return;
+  }
+  // Keep a short trail of recent cursor positions. When a multi-finger gesture
+  // is detected a moment from now, beginGestureFreeze() rewinds to one of these
+  // samples to undo the drift caused by the first finger landing slightly before
+  // the OS recognises the 2/3-finger gesture (the residual "cursor moved" jump).
+  this._recordCursor(_nowMM, e.clientX, e.clientY);
   // Self-heal a stuck button flag: if no mouse button is actually pressed now
   // (e.buttons === 0), a mouseup was missed — released outside the window, focus
   // stolen by a share sheet / external link, a modal opened mid-press, etc.
@@ -1145,6 +1242,10 @@ App.prototype.mouse_move = function(e) {
 
 App.prototype.mouse_over = function(e) {
   if (this.modalShown)
+    return;
+  // Don't update the remembered cursor position during a gesture, so a later
+  // redraw won't reposition the hover highlight to where the fingers drifted.
+  if (this._gestureUntil && Date.now() < this._gestureUntil)
     return;
 
   this.curX = e.clientX;

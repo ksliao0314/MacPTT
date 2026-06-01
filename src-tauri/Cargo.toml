@@ -1,6 +1,6 @@
 [package]
 name = "pttchrome-v3-tauri"
-version = "1.1.0"
+version = "1.1.1"
 description = "MacPTT — a native macOS PTT BBS client"
 authors = ["MacPTT"]
 edition = "2021"
@@ -33,8 +33,9 @@ rand = "0.8"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSArray", "NSString", "NSURL", "NSGeometry"] }
-objc2-app-kit = { version = "0.3", features = ["NSSharingService", "NSResponder", "NSView", "NSWindow", "NSGraphics", "NSColor", "NSColorSpace"] }
+block2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSSet", "NSEnumerator", "NSString", "NSURL", "NSGeometry"] }
+objc2-app-kit = { version = "0.3", features = ["NSSharingService", "NSResponder", "NSView", "NSWindow", "NSGraphics", "NSColor", "NSColorSpace", "NSEvent", "NSTouch"] }
 
 [dev-dependencies]
 # Extra tokio features only needed by examples/ws_smoke.rs (standalone runtime).

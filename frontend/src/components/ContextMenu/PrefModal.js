@@ -15,6 +15,7 @@ const DEFAULT_PREFS = {
   enableEasyReading: true, // "自動開圖" — on by default
   trackpadSmoothScroll: true,
   trackpadScrollSpeed: 2,
+  trackpadGesture: false, // three-finger swipe = page up/down (opt-in)
   endTurnsOnLiveUpdate: true,
   copyOnSelect: false,
   antiIdleTime: 180,
@@ -250,7 +251,7 @@ const InfoGlyph = () => (
 );
 
 // --- About / licenses / changelog -----------------------------------------
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.1.1";
 
 function openExternal(url) {
   if (typeof window !== "undefined" && window.__TAURI__) {
@@ -276,6 +277,16 @@ const CREDITS = [
 ];
 
 const CHANGELOG = [
+  {
+    v: "1.1.1",
+    date: "2026-06-01",
+    items: [
+      "新增觸控板三指上下翻頁（設定 → 一般 → 觸控板，預設關閉）；翻頁時自動鎖定系統指標與高亮，不誤入文章",
+      "帳號分頁改為自動儲存；首次設定並開啟自動登入後，關閉設定會自動重新連線並登入",
+      "選單列新增「檢視 → 重新連線」（⌘⇧R）",
+      "斷線／開發者模式／貼上提示改用 macOS 原生風格卡片，移除最後的舊版警示樣式"
+    ]
+  },
   {
     v: "1.1.0",
     date: "2026-05-31",
@@ -620,7 +631,14 @@ const GeneralPane = ({
       />
     </Section>
 
-    <Section title="觸控板">
+    <Section
+      title="觸控板"
+      footnote={
+        values.trackpadGesture
+          ? "⚠️ 三指翻頁已開啟。為免與系統手勢衝突，請到「系統設定 → 觸控式軌跡板 → 更多手勢」把三指的「Mission Control／App Exposé」關閉或改為四指。翻頁時 App 會自動把指標鎖在原地，三指設為「拖移」也不受影響。"
+          : undefined
+      }
+    >
       <ToggleRow
         label="平滑觸控板捲動"
         hint="避免捲太快、誤跳上下篇"
@@ -635,6 +653,13 @@ const GeneralPane = ({
         max={5}
         value={values.trackpadScrollSpeed}
         onChange={onNumberInputChange}
+      />
+      <ToggleRow
+        label="三指上下翻頁"
+        hint="三指向上＝下一頁、向下＝上一頁；翻頁時自動鎖定指標與高亮"
+        name="trackpadGesture"
+        checked={values.trackpadGesture}
+        onChange={onCheckboxChange}
       />
     </Section>
   </React.Fragment>

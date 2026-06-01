@@ -1,23 +1,17 @@
 import React from "react";
-import { Alert, Button } from "react-bootstrap";
-import { i18n } from "../js/i18n";
-import "./PageTopAlert.css";
+import { MacAlert, InfoGlyph } from "./MacAlert";
 
 export const PasteShortcutAlert = ({ onDismiss }) => (
-  <Alert
-    bsStyle="info"
-    className="PageTopAlert"
-    tabIndex={-1}
-    onDismiss={onDismiss}
-  >
-    <h4>{i18n("alert_pasteShortcutHeader")}</h4>
-    <p>{i18n("alert_pasteShortcutText")}</p>
-    <p>
-      <Button bsStyle="primary" onClick={onDismiss}>
-        {i18n("alert_pasteShortcutClose")}
-      </Button>
-    </p>
-  </Alert>
+  <MacAlert
+    variant="info"
+    icon={<InfoGlyph />}
+    title="貼上"
+    text="請使用 Shift+Insert 快速鍵來貼上。"
+    primaryLabel="確定"
+    onPrimary={onDismiss}
+    onClose={onDismiss}
+    ariaLabel="貼上"
+  />
 );
 
 export default PasteShortcutAlert;

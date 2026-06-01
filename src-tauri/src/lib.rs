@@ -542,6 +542,14 @@ fn icloud_write(content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn set_gesture_enabled(enabled: bool) {
+    #[cfg(target_os = "macos")]
+    macos_gestures::set_enabled(enabled);
+    #[cfg(not(target_os = "macos"))]
+    let _ = enabled;
+}
+
+#[tauri::command]
 fn set_password(app: AppHandle, account: String, password: String) -> Result<(), String> {
     let _guard = SECRETS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let key = local_key(&app)?;
@@ -860,6 +868,237 @@ mod macos_share {
     }
 }
 
+// Three-finger vertical trackpad swipe → PageUp / PageDown. The webview can't see
+// finger count, so we read raw NSTouch from a local event monitor. (macOS reserves
+// 3-finger up/down for Mission Control / App Exposé by default — the user must
+// remap those in System Settings ▸ Trackpad for this to reach the app.)
+#[cfg(target_os = "macos")]
+mod macos_gestures {
+    use block2::RcBlock;
+    use objc2_app_kit::{NSEvent, NSEventMask, NSEventType, NSTouchPhase, NSWindow};
+    use std::ptr::NonNull;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+    use tauri::{AppHandle, Emitter};
+
+    // Opt-in: the "三指上下翻頁" setting toggles this. While false, handle() does
+    // nothing — the trackpad behaves completely normally (no cursor pinning).
+    static GESTURE_ENABLED: AtomicBool = AtomicBool::new(false);
+    pub fn set_enabled(on: bool) {
+        GESTURE_ENABLED.store(on, Ordering::Relaxed);
+    }
+
+    // --- CoreGraphics cursor control (freeze the system arrow during gestures) ---
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct CGPoint {
+        x: f64,
+        y: f64,
+    }
+    type CGEventRef = *mut std::ffi::c_void;
+    type CGEventSourceRef = *mut std::ffi::c_void;
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGEventCreate(source: CGEventSourceRef) -> CGEventRef;
+        fn CGEventGetLocation(event: CGEventRef) -> CGPoint;
+        fn CGWarpMouseCursorPosition(new_cursor_position: CGPoint) -> i32;
+        fn CGAssociateMouseAndMouseCursorPosition(connected: i32) -> i32;
+    }
+    #[link(name = "CoreFoundation", kind = "framework")]
+    extern "C" {
+        fn CFRelease(cf: *const std::ffi::c_void);
+    }
+
+    // Current cursor position in CoreGraphics global coords (top-left origin) —
+    // exactly what CGWarpMouseCursorPosition expects, so no Y flipping needed.
+    unsafe fn current_cursor() -> CGPoint {
+        let e = CGEventCreate(std::ptr::null_mut());
+        let p = CGEventGetLocation(e);
+        if !e.is_null() {
+            CFRelease(e as *const std::ffi::c_void);
+        }
+        p
+    }
+
+    struct GState {
+        tracking: bool,
+        start_y: f64,
+        fired: bool,
+        // Where the cursor was pinned when the current 2+-finger gesture began.
+        // None when no gesture is active.
+        pin: Option<(f64, f64)>,
+    }
+    static GESTURE: Mutex<GState> = Mutex::new(GState {
+        tracking: false,
+        start_y: 0.0,
+        fired: false,
+        pin: None,
+    });
+    // When the cursor was last warped. A gap longer than a couple frames means
+    // the previous gesture ended (release frame missed, e.g. focus loss), so the
+    // next 2-finger frame must re-capture rather than warp to a stale point.
+    static LAST_WARP: Mutex<Option<Instant>> = Mutex::new(None);
+
+    // Recent (time, x, y) cursor samples in CG coords, recorded on plain mouse
+    // moves while no gesture is active. Lets a starting gesture warp back to the
+    // pre-touch position instead of the spot the first finger already nudged to.
+    static CURSOR_HIST: Mutex<Vec<(Instant, f64, f64)>> = Mutex::new(Vec::new());
+
+    const THRESHOLD: f64 = 0.12; // fraction of trackpad height to count as a swipe
+    const PRE_NUDGE_MS: u64 = 90; // rewind this far to clear first-finger drift
+
+    // The cursor position from ~PRE_NUDGE_MS ago (newest sample at least that old),
+    // i.e. just before the finger landed. Falls back to the oldest sample, then to
+    // the live cursor if there is no history at all.
+    fn pre_nudge_pos(now: Instant) -> CGPoint {
+        let h = CURSOR_HIST.lock().unwrap_or_else(|e| e.into_inner());
+        let target = now
+            .checked_sub(Duration::from_millis(PRE_NUDGE_MS))
+            .unwrap_or(now);
+        let mut chosen: Option<(f64, f64)> = None;
+        for &(t, x, y) in h.iter() {
+            if t <= target {
+                chosen = Some((x, y));
+            }
+        }
+        let chosen = chosen.or_else(|| h.first().map(|&(_, x, y)| (x, y)));
+        match chosen {
+            Some((x, y)) => CGPoint { x, y },
+            None => unsafe { current_cursor() },
+        }
+    }
+
+    fn handle(event: &NSEvent, app: &AppHandle) {
+        // Disabled in settings → leave the trackpad entirely alone.
+        if !GESTURE_ENABLED.load(Ordering::Relaxed) {
+            return;
+        }
+        let now = Instant::now();
+        let mut st = GESTURE.lock().unwrap_or_else(|e| e.into_inner());
+
+        // While no gesture is pinned, keep sampling the cursor so a gesture that
+        // starts in a moment can rewind past the first-finger drift.
+        if st.pin.is_none() {
+            let cur = unsafe { current_cursor() };
+            let mut h = CURSOR_HIST.lock().unwrap_or_else(|e| e.into_inner());
+            h.push((now, cur.x, cur.y));
+            let cutoff = now.checked_sub(Duration::from_millis(400)).unwrap_or(now);
+            while h.len() > 1 && h[0].0 < cutoff {
+                h.remove(0);
+            }
+        }
+
+        // Plain mouse moves are only for the sampling above — no touch handling.
+        if event.r#type() == NSEventType::MouseMoved {
+            return;
+        }
+
+        let touches = event.touchesMatchingPhase_inView(NSTouchPhase::Touching, None);
+        let count = touches.count();
+
+        // While 2+ fingers are down, keep refreshing a short window in the webview
+        // so it (a) ignores click-to-enter (covers the press AND the release click)
+        // and (b) freezes the mouse-browsing hover so paging doesn't drag it.
+        if count >= 2 {
+            let _ = app.emit("gesture://multitouch", ());
+
+            // Freeze the SYSTEM arrow cursor. With "three-finger drag" enabled in
+            // macOS, a 3-finger swipe drags the pointer; users only want to page.
+            // Pin on the first frame, then warp back every frame. CGWarp also
+            // suppresses trackpad-driven movement for ~250ms, so this both pins the
+            // cursor AND self-recovers if a gesture-end is missed.
+            let mut lw = LAST_WARP.lock().unwrap_or_else(|e| e.into_inner());
+            let fresh = match (*lw, st.pin) {
+                (Some(t), Some(_)) => now.duration_since(t).as_millis() <= 120,
+                _ => false,
+            };
+            unsafe {
+                let p = if fresh {
+                    let (x, y) = st.pin.unwrap();
+                    CGPoint { x, y }
+                } else {
+                    // New gesture (or stale pin): pin to where the cursor was just
+                    // BEFORE the first finger nudged it, not its drifted spot.
+                    let c = pre_nudge_pos(now);
+                    st.pin = Some((c.x, c.y));
+                    c
+                };
+                CGWarpMouseCursorPosition(p);
+            }
+            *lw = Some(now);
+        } else if st.pin.is_some() {
+            // Fingers lifted: release the cursor and restore immediate tracking.
+            st.pin = None;
+            unsafe {
+                CGAssociateMouseAndMouseCursorPosition(1);
+            }
+        }
+
+        if count == 3 {
+            let arr = touches.allObjects();
+            let n = arr.count();
+            if n == 0 {
+                return;
+            }
+            let mut sum = 0.0;
+            for i in 0..n {
+                let t = arr.objectAtIndex(i);
+                sum += t.normalizedPosition().y;
+            }
+            let avg = sum / (n as f64);
+            if !st.tracking {
+                st.tracking = true;
+                st.start_y = avg;
+                st.fired = false;
+                eprintln!("[gesture] 3-finger start (y={:.3})", avg);
+            } else if !st.fired {
+                let dy = avg - st.start_y; // normalizedPosition y: 0 bottom .. 1 top
+                if dy.abs() > THRESHOLD {
+                    st.fired = true;
+                    // Reversed to match PTT paging direction (per user): swipe up
+                    // = next page (PageDown), swipe down = previous page (PageUp).
+                    let ev = if dy > 0.0 {
+                        "gesture://pagedown"
+                    } else {
+                        "gesture://pageup"
+                    };
+                    let _ = app.emit(ev, ());
+                    eprintln!("[gesture] {} (dy={:.3})", ev, dy);
+                }
+            }
+        } else if st.tracking {
+            st.tracking = false;
+        }
+    }
+
+    /// Main thread only. ns_window is the NSWindow pointer.
+    pub unsafe fn install(app: AppHandle, ns_window: *mut std::ffi::c_void) {
+        if ns_window.is_null() {
+            return;
+        }
+        let window: &NSWindow = &*(ns_window as *const NSWindow);
+        // The content view must accept touches for the OS to deliver NSTouch data.
+        if let Some(view) = window.contentView() {
+            view.setAcceptsTouchEvents(true);
+        }
+        // Generate mouse-moved events so we can sample the pre-gesture cursor.
+        window.setAcceptsMouseMovedEvents(true);
+        let block = RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
+            handle(event.as_ref(), &app);
+            event.as_ptr()
+        });
+        let mask = NSEventMask::Gesture
+            | NSEventMask::BeginGesture
+            | NSEventMask::EndGesture
+            | NSEventMask::MouseMoved;
+        let token = NSEvent::addLocalMonitorForEventsMatchingMask_handler(mask, &block);
+        std::mem::forget(token);
+        std::mem::forget(block);
+    }
+}
+
 // Native macOS application menu: gives the app proper ⌘-shortcuts (Settings ⌘,,
 // standard Edit copy/paste/select-all, Quit, Window, About) instead of the bare
 // default. Custom items emit events the frontend listens for.
@@ -875,6 +1114,9 @@ fn build_app_menu<R: tauri::Runtime>(
         .build(app)?;
     let refresh = MenuItemBuilder::with_id("refresh", "重新整理畫面")
         .accelerator("Cmd+R")
+        .build(app)?;
+    let reconnect = MenuItemBuilder::with_id("reconnect", "重新連線")
+        .accelerator("Cmd+Shift+R")
         .build(app)?;
 
     let about_meta = AboutMetadata {
@@ -912,7 +1154,10 @@ fn build_app_menu<R: tauri::Runtime>(
         .select_all()
         .build()?;
 
-    let view_menu = SubmenuBuilder::new(app, "檢視").item(&refresh).build()?;
+    let view_menu = SubmenuBuilder::new(app, "檢視")
+        .item(&refresh)
+        .item(&reconnect)
+        .build()?;
 
     let window_menu = SubmenuBuilder::new(app, "視窗")
         .minimize()
@@ -940,8 +1185,13 @@ pub fn run() {
                 if let Some(window) = app.get_webview_window("main") {
                     if let Ok(nsw) = window.ns_window() {
                         let ptr = nsw as usize;
+                        let app_handle = app.handle().clone();
                         let _ = window.run_on_main_thread(move || unsafe {
                             macos_share::lock_aspect_ratio(ptr as *mut std::ffi::c_void);
+                            macos_gestures::install(
+                                app_handle,
+                                ptr as *mut std::ffi::c_void,
+                            );
                         });
                     }
                 }
@@ -957,6 +1207,9 @@ pub fn run() {
                 }
                 "refresh" => {
                     let _ = app.emit("menu://refresh", ());
+                }
+                "reconnect" => {
+                    let _ = app.emit("menu://reconnect", ());
                 }
                 _ => {}
             }
@@ -976,7 +1229,8 @@ pub fn run() {
             delete_password,
             system_accent_color,
             icloud_status,
-            icloud_write
+            icloud_write,
+            set_gesture_enabled
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

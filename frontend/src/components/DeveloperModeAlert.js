@@ -1,20 +1,17 @@
 import React from "react";
-import { Alert, Button, Fade } from "react-bootstrap";
-import { i18n } from "../js/i18n";
-import "./PageTopAlert.css";
+import { MacAlert, WarningGlyph } from "./MacAlert";
 
 export const DeveloperModeAlert = ({ onDismiss }) => (
-  <Fade in>
-    <Alert bsStyle="danger" className="PageTopAlert" onDismiss={onDismiss}>
-      <h4>{i18n("alert_developerModeHeader")}</h4>
-      <p>{i18n("alert_developerModeText")}</p>
-      <p>
-        <Button bsStyle="danger" onClick={onDismiss}>
-          {i18n("alert_developerModeDismiss")}
-        </Button>
-      </p>
-    </Alert>
-  </Fade>
+  <MacAlert
+    variant="warning"
+    icon={<WarningGlyph />}
+    title="開發者模式"
+    text="您正在使用開發者模式，部分功能可能不穩定，無法保證一切正常運作。"
+    primaryLabel="我瞭解了"
+    onPrimary={onDismiss}
+    onClose={onDismiss}
+    ariaLabel="開發者模式"
+  />
 );
 
 export default DeveloperModeAlert;
