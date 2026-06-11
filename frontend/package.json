@@ -2,7 +2,6 @@
   "name": "pttchrome",
   "version": "1.2.0",
   "dependencies": {
-    "base58": "^1.0.1",
     "bootstrap": "^3.3.7",
     "classnames": "^2.2.5",
     "hammerjs": "^2.0.8",
@@ -98,7 +97,7 @@
   "scripts": {
     "clean": "rimraf dist/assets dist/index.html",
     "prebuild": "npm run clean",
-    "build": "cross-env webpack",
+    "build": "cross-env NODE_OPTIONS=--openssl-legacy-provider webpack",
     "prestart": "npm run clean",
     "start": "cross-env NODE_ENV=development webpack-dev-server"
   }

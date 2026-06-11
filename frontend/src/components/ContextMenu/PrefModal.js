@@ -251,7 +251,7 @@ const InfoGlyph = () => (
 );
 
 // --- About / licenses / changelog -----------------------------------------
-const APP_VERSION = "1.1.1";
+const APP_VERSION = "1.2.0";
 
 function openExternal(url) {
   if (typeof window !== "undefined" && window.__TAURI__) {
@@ -277,6 +277,16 @@ const CREDITS = [
 ];
 
 const CHANGELOG = [
+  {
+    v: "1.2.0",
+    date: "2026-06-11",
+    items: [
+      "新增自動更新：選單列「MacPTT → 檢查更新…」，有新版可一鍵下載更新並重啟（啟動後也會靜默檢查）",
+      "新增「在本頁尋找」（⌘F）：搜尋目前畫面、高亮符合處、⏎／⇧⏎ 切換上下個，翻頁自動重搜",
+      "效能：終端機改為只重繪有變動的列，捲動與狀態列時鐘跳動更省資源",
+      "工程：一鍵建置（npm run build）、版本號統一、修正分享面板記憶體洩漏、新增資安單元測試"
+    ]
+  },
   {
     v: "1.1.1",
     date: "2026-06-01",

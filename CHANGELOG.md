@@ -6,6 +6,23 @@
 
 ---
 
+## [1.2.0] - 2026-06-11
+
+### 新增
+- **自動更新**（`tauri-plugin-updater`）：選單列「MacPTT → 檢查更新…」，啟動數秒後也會靜默檢查。有新版時以原生卡片詢問，按「更新並重啟」即下載安裝（更新包以本機私鑰簽章驗證）。
+- **「在本頁尋找」（⌘F）**：搜尋目前螢幕緩衝、用終端機座標疊上高亮框、顯示 `n/m`、⏎／⇧⏎ 切換上下個、Esc 關閉；翻頁時自動重搜。輸入時以 modal 狀態隔離鍵盤，不會打進 BBS。
+
+### 效能
+- **終端機只重繪有變動的列**：`Row` 以 `React.memo` + 完整內容簽章比對，狀態列時鐘跳動或捲動時不再重建整個畫面的 segment 樹與 reconcile。
+
+### 工程 / 修正
+- **一鍵建置**：`npm run dev` / `npm run build`（`beforeBuildCommand` 自動先建前端；`--openssl-legacy-provider` 收進前端腳本）。
+- 修正分享面板每次分享都洩漏 `NSSharingServicePicker`／items（改為單槽 thread-local）。
+- 移除 release 殘留的手勢除錯輸出、未使用的 `base58` 依賴；統一各檔版本號。
+- 新增 Rust 單元測試：SSRF 分類器（含 IPv4-mapped／6to4／NAT64）、host 解析、AES-256-GCM 加解密往返。
+
+---
+
 ## [1.1.1] - 2026-06-01
 
 ### 新增

@@ -541,6 +541,48 @@ fn icloud_write(content: String) -> Result<(), String> {
     std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
 }
 
+// Holds the update found by check_update so install_update can apply it.
+struct PendingUpdate(std::sync::Mutex<Option<tauri_plugin_updater::Update>>);
+
+// Returns the new version string if an update is available (and stashes it for
+// install_update), or None if already up to date. Errors (no manifest / offline)
+// propagate so the UI can stay quiet on a silent check.
+#[tauri::command]
+async fn check_update(
+    app: AppHandle,
+    pending: tauri::State<'_, PendingUpdate>,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    match updater.check().await.map_err(|e| e.to_string())? {
+        Some(update) => {
+            let version = update.version.clone();
+            *pending.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(update);
+            Ok(Some(version))
+        }
+        None => Ok(None),
+    }
+}
+
+// Downloads + installs the update stashed by check_update, then relaunches.
+#[tauri::command]
+async fn install_update(
+    app: AppHandle,
+    pending: tauri::State<'_, PendingUpdate>,
+) -> Result<(), String> {
+    let update = pending
+        .0
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .take()
+        .ok_or_else(|| "沒有待安裝的更新".to_string())?;
+    update
+        .download_and_install(|_chunk, _total| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+    app.restart();
+}
+
 #[tauri::command]
 fn set_gesture_enabled(enabled: bool) {
     #[cfg(target_os = "macos")]
@@ -806,6 +848,20 @@ mod macos_share {
     use objc2_app_kit::{NSSharingServicePicker, NSView, NSWindow};
     use objc2_foundation::{NSArray, NSPoint, NSRect, NSRectEdge, NSSize, NSString, NSURL};
 
+    // The share picker + its backing items must outlive the open popover. Keep
+    // exactly ONE share's worth alive in a main-thread-only slot; opening a new
+    // share releases the previous set (AppKit still retains anything on screen),
+    // so this no longer leaks on every share.
+    thread_local! {
+        static SHARE_KEEPALIVE: std::cell::RefCell<
+            Option<(
+                Retained<NSSharingServicePicker>,
+                Retained<NSArray<NSURL>>,
+                Retained<NSURL>,
+            )>,
+        > = const { std::cell::RefCell::new(None) };
+    }
+
     /// Present the share sheet for a single NSURL (file or web). Main thread only.
     unsafe fn present(url_obj: Retained<NSURL>, ns_window: *mut std::ffi::c_void) {
         if ns_window.is_null() {
@@ -835,11 +891,10 @@ mod macos_share {
         );
         picker.showRelativeToRect_ofView_preferredEdge(rect, &content_view, NSRectEdge::NSMinYEdge);
 
-        // Keep the picker AND its backing items alive while the popover is open,
-        // otherwise the panel shows up empty / spinning.
-        std::mem::forget(picker);
-        std::mem::forget(items);
-        std::mem::forget(url_obj);
+        // Hold this share's objects alive (releasing the previous share's).
+        SHARE_KEEPALIVE.with(|k| {
+            *k.borrow_mut() = Some((picker, items, url_obj));
+        });
     }
 
     pub unsafe fn show_share_sheet(path: &str, ns_window: *mut std::ffi::c_void) {
@@ -1052,7 +1107,6 @@ mod macos_gestures {
                 st.tracking = true;
                 st.start_y = avg;
                 st.fired = false;
-                eprintln!("[gesture] 3-finger start (y={:.3})", avg);
             } else if !st.fired {
                 let dy = avg - st.start_y; // normalizedPosition y: 0 bottom .. 1 top
                 if dy.abs() > THRESHOLD {
@@ -1065,7 +1119,6 @@ mod macos_gestures {
                         "gesture://pageup"
                     };
                     let _ = app.emit(ev, ());
-                    eprintln!("[gesture] {} (dy={:.3})", ev, dy);
                 }
             }
         } else if st.tracking {
@@ -1112,11 +1165,15 @@ fn build_app_menu<R: tauri::Runtime>(
     let settings = MenuItemBuilder::with_id("settings", "設定…")
         .accelerator("Cmd+,")
         .build(app)?;
+    let check_update = MenuItemBuilder::with_id("check_update", "檢查更新…").build(app)?;
     let refresh = MenuItemBuilder::with_id("refresh", "重新整理畫面")
         .accelerator("Cmd+R")
         .build(app)?;
     let reconnect = MenuItemBuilder::with_id("reconnect", "重新連線")
         .accelerator("Cmd+Shift+R")
+        .build(app)?;
+    let find = MenuItemBuilder::with_id("find", "在本頁尋找…")
+        .accelerator("Cmd+F")
         .build(app)?;
 
     let about_meta = AboutMetadata {
@@ -1132,6 +1189,7 @@ fn build_app_menu<R: tauri::Runtime>(
     let about_item = PredefinedMenuItem::about(app, Some("關於 MacPTT"), Some(about_meta))?;
     let app_menu = SubmenuBuilder::new(app, "MacPTT")
         .item(&about_item)
+        .item(&check_update)
         .separator()
         .item(&settings)
         .separator()
@@ -1152,6 +1210,8 @@ fn build_app_menu<R: tauri::Runtime>(
         .copy()
         .paste()
         .select_all()
+        .separator()
+        .item(&find)
         .build()?;
 
     let view_menu = SubmenuBuilder::new(app, "檢視")
@@ -1176,7 +1236,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(ConnState::default())
+        .manage(PendingUpdate(std::sync::Mutex::new(None)))
         .setup(|app| {
             // Lock the window's aspect ratio (resizable, but keeps proportions).
             #[cfg(target_os = "macos")]
@@ -1211,6 +1273,12 @@ pub fn run() {
                 "reconnect" => {
                     let _ = app.emit("menu://reconnect", ());
                 }
+                "check_update" => {
+                    let _ = app.emit("menu://check-update", ());
+                }
+                "find" => {
+                    let _ = app.emit("menu://find", ());
+                }
                 _ => {}
             }
         })
@@ -1230,8 +1298,108 @@ pub fn run() {
             system_accent_color,
             icloud_status,
             icloud_write,
-            set_gesture_enabled
+            set_gesture_enabled,
+            check_update,
+            install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::IpAddr;
+
+    fn ip(s: &str) -> IpAddr {
+        s.parse().unwrap()
+    }
+
+    #[test]
+    fn ssrf_rejects_non_global_v4() {
+        for s in [
+            "127.0.0.1",       // loopback
+            "10.0.0.1",        // private
+            "192.168.1.1",     // private
+            "172.16.0.1",      // private
+            "169.254.0.1",     // link-local
+            "100.64.0.1",      // CGNAT
+            "192.0.0.1",       // 192.0.0.0/24
+            "0.0.0.0",         // unspecified
+            "255.255.255.255", // broadcast
+            "224.0.0.1",       // multicast
+        ] {
+            assert!(!ip_is_global(ip(s)), "{s} should be non-global");
+        }
+    }
+
+    #[test]
+    fn ssrf_accepts_public_v4() {
+        for s in ["1.1.1.1", "8.8.8.8", "140.112.172.11"] {
+            assert!(ip_is_global(ip(s)), "{s} should be global");
+        }
+    }
+
+    #[test]
+    fn ssrf_rejects_embedded_and_special_v6() {
+        for s in [
+            "::1",              // loopback
+            "::",               // unspecified
+            "fe80::1",          // link-local
+            "fc00::1",          // ULA
+            "fd00::1",          // ULA
+            "::ffff:127.0.0.1", // IPv4-mapped loopback
+            "::ffff:10.0.0.1",  // IPv4-mapped private
+            "2002:7f00:0001::", // 6to4 embedding 127.0.0.1
+            "64:ff9b::a00:1",   // NAT64 embedding 10.0.0.1
+            "2001:db8::1",      // documentation
+            "ff02::1",          // multicast
+        ] {
+            assert!(!ip_is_global(ip(s)), "{s} should be non-global");
+        }
+    }
+
+    #[test]
+    fn ssrf_accepts_public_v6() {
+        assert!(ip_is_global(ip("2606:4700:4700::1111"))); // Cloudflare DNS
+    }
+
+    #[test]
+    fn extract_host_handles_userinfo_ports_ipv6() {
+        assert_eq!(extract_host("https://ws.ptt.cc/bbs").as_deref(), Some("ws.ptt.cc"));
+        assert_eq!(extract_host("https://user:pw@evil.com/x").as_deref(), Some("evil.com"));
+        assert_eq!(extract_host("http://[::1]:8080/x").as_deref(), Some("::1"));
+        assert_eq!(extract_host("https://host:443").as_deref(), Some("host"));
+        assert_eq!(extract_host("notaurl"), None);
+    }
+
+    #[test]
+    fn url_public_http_rejects_bad_scheme_and_loopback() {
+        // No network needed: scheme check + loopback resolution only.
+        assert!(!url_is_public_http("ftp://example.com"));
+        assert!(!url_is_public_http("file:///etc/passwd"));
+        assert!(!url_is_public_http("http://127.0.0.1/x"));
+        assert!(!url_is_public_http("http://localhost/x"));
+    }
+
+    #[test]
+    fn aes_roundtrip() {
+        let key = [7u8; 32];
+        let secret = "p@ssw0rd 測試";
+        let blob = encrypt(&key, secret).unwrap();
+        assert_ne!(&blob[12..], secret.as_bytes(), "ciphertext must differ from plaintext");
+        assert_eq!(decrypt(&key, &blob).unwrap(), secret);
+    }
+
+    #[test]
+    fn aes_wrong_key_fails() {
+        let blob = encrypt(&[1u8; 32], "secret").unwrap();
+        assert!(decrypt(&[2u8; 32], &blob).is_err());
+    }
+
+    #[test]
+    fn aes_nonce_is_random() {
+        let key = [3u8; 32];
+        assert_ne!(encrypt(&key, "x").unwrap(), encrypt(&key, "x").unwrap());
+    }
 }

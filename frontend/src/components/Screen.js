@@ -1,4 +1,4 @@
-import Row from "./Row";
+import Row, { rowSig } from "./Row";
 import ImagePreviewer, {
   of,
   resolveSrcToImageUrl,
@@ -53,6 +53,7 @@ export class Screen extends React.Component {
           <Row
             key={row}
             chars={chars}
+            sig={rowSig(chars)}
             row={row}
             forceWidth={this.props.forceWidth}
             enableLinkInlinePreview={this.props.enableLinkInlinePreview}

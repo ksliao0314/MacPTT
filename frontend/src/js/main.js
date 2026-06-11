@@ -6,6 +6,8 @@ import { setupExternalOpen } from './external_open';
 import { setupSettingsButton } from './settings_button';
 import { setupNavHints } from './nav_hints';
 import { setupNativeMenu } from './native_menu';
+import { setupUpdater } from './updater';
+import { setupFindBar } from './find_bar';
 import { preload as preloadCredentials, hasSavedLogin } from './credentials';
 import { maybePromptSavedLogin } from './login_prompt';
 import { setupIcloudSync, pull as icloudPull } from './icloud_sync';
@@ -65,6 +67,8 @@ function startApp() {
     setupSettingsButton(app);
     setupNavHints(app);
     setupNativeMenu(app);
+    setupUpdater();
+    setupFindBar(app);
     setupIcloudSync(app);
     $('#BBSWindow').show();
     //$('#sideMenus').show();
