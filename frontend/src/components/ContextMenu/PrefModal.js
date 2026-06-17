@@ -251,7 +251,7 @@ const InfoGlyph = () => (
 );
 
 // --- About / licenses / changelog -----------------------------------------
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.2.1";
 
 function openExternal(url) {
   if (typeof window !== "undefined" && window.__TAURI__) {
@@ -277,6 +277,13 @@ const CREDITS = [
 ];
 
 const CHANGELOG = [
+  {
+    v: "1.2.1",
+    date: "2026-06-17",
+    items: [
+      "改用 Apple Developer ID 簽章並通過 Apple 公證（notarization）：下載開啟不再出現「已損毀／未識別開發者」的 Gatekeeper 警告"
+    ]
+  },
   {
     v: "1.2.0",
     date: "2026-06-11",

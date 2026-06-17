@@ -1,6 +1,6 @@
 [package]
 name = "pttchrome-v3-tauri"
-version = "1.2.0"
+version = "1.2.1"
 description = "MacPTT — a native macOS PTT BBS client"
 authors = ["MacPTT"]
 edition = "2021"
